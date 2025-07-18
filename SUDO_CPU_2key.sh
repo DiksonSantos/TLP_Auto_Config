@@ -13,6 +13,9 @@ def is_steam_game_running():
             return True
     return False
 
+
+
+
 def fix_log_permissions(password):
     """Altera as permissões do arquivo de log para 666 (leitura e escrita para todos)."""
     cmd = "chmod 666 /var/log/pos_Blue_Brilho.log"
@@ -28,8 +31,45 @@ def fix_log_permissions(password):
     else:
         print(f"❌ Erro ao corrigir permissões do log: {result.stderr}")
 
+# def is_any_steam_game_running():
+#     try:
+#         from WinePuro import is_proton_game_running
+#         return is_steam_game_running() or is_proton_game_running()
+#     except ImportError:
+#         return is_steam_game_running()
+
+
 def is_any_steam_game_running():
-    return is_steam_game_running()
+    def is_steam_game_running():
+        result = subprocess.run(["pgrep", "-f", "steamapps"], stdout=subprocess.DEVNULL)
+        return result.returncode == 0
+
+    try:
+        from WinePuro import is_proton_game_running
+        game_running = is_steam_game_running() or is_proton_game_running()
+    except ImportError:
+        game_running = is_steam_game_running()
+
+    try:
+        # Verifica se o slideshow está ligado ou desligado
+        slideshow_status = subprocess.check_output([
+            "gsettings", "get", "org.cinnamon.desktop.background.slideshow", "slideshow-enabled"
+        ]).decode("utf-8").strip()
+
+        if game_running and slideshow_status == "true":
+            subprocess.run([
+                "gsettings", "set", "org.cinnamon.desktop.background.slideshow", "slideshow-enabled", "false"
+            ])
+        elif not game_running and slideshow_status == "false":
+            subprocess.run([
+                "gsettings", "set", "org.cinnamon.desktop.background.slideshow", "slideshow-enabled", "true"
+            ])
+
+    except Exception as e:
+        print(f"Erro ao controlar slideshow: {e}")
+
+    return game_running
+
 
 def get_power_state(password):
     """Retorna 'on_ac' se conectado na tomada, ou 'on_battery'."""
@@ -110,5 +150,5 @@ def set_cpu_governor(password):
         print(f"Erro inesperado: {e}")
 
 if __name__ == "__main__":
-    user_password = 'Sua_Senha_AQUI'  # substitua por input() se quiser interativo
+    user_password = 'sigma360'  # substitua por input() se quiser interativo
     set_cpu_governor(user_password)
