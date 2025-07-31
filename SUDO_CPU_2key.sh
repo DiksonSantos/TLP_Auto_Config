@@ -150,5 +150,5 @@ def set_cpu_governor(password):
         print(f"Erro inesperado: {e}")
 
 if __name__ == "__main__":
-    user_password = 'sigma360'  # substitua por input() se quiser interativo
+    user_password = 'SuaSenha_Aqui'  # substitua por input() se quiser interativo
     set_cpu_governor(user_password)
