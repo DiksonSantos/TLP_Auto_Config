@@ -53,18 +53,18 @@ def gerenciar_slideshow_cinnamon():
             ])
 
             nome = processo_encontrado[processo_encontrado.rfind('/')+1:]
-            #print(nome)
-            #print(f"🔕 API detectada. Slideshow desativado: {agora}.")
-            pass
+            print(nome)
+            print(f"🔕 API detectada. Slideshow desativado: {agora}.")
+            #pass
         elif not jogo_ativo and status_atual == "false":
             subprocess.run([
                 "gsettings", "set", "org.cinnamon.desktop.background.slideshow", "slideshow-enabled", "true"
             ])
-            #print(f"🎞️ Nada ativo. Slideshow ativado: {agora}")
-            pass
+            print(f"🎞️ Nada ativo. Slideshow ativado: {agora}")
+            #pass
         else:
-            #print("ℹ️ Nenhuma alteração no slideshow foi necessária.")
-            pass
+            print("ℹ️ Nenhuma alteração no slideshow foi necessária.")
+            #pass
     except Exception as e:
         print(f"Erro ao controlar slideshow: {e}")
 

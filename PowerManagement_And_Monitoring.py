@@ -4,6 +4,7 @@ import subprocess
 import os
 import re
 import glob
+import time
 
 # =================== Configurações =====================
 SCRIPT_PATH = "/home/dikson/Linux_Helper/TLP_Power_Management/SUDO_CPU_2key.sh"
@@ -64,14 +65,43 @@ def is_any_steam_game_running():
     status_var.set("Configuração Wine atualizada.")
     messagebox.showinfo("✅ Sucesso", "Configuração Wine atualizada.\n\nReinicie o serviço systemd para aplicar.")
 
+def get_gpu_usage():
+    try:
+        result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, check=True)
+        output = result.stdout
+        match = re.search(r'\|\s*N/A\s*(\d+C)\s*P\d\s*.*?(\d+%)\s*Default\s*\|', output)
+        if match:
+            temp, usage = match.groups()
+            return f"{usage} ({temp})"
+        return "N/A"
+    except subprocess.CalledProcessError:
+        return "Erro: nvidia-smi não instalado"
+    except Exception as e:
+        return f"Erro: {str(e)}"
+
+# NOVO: Função para capturar a temperatura da CPU via lm-sensors
+def get_cpu_temp():
+    try:
+        result = subprocess.run(['sensors'], capture_output=True, text=True, check=True)
+        output = result.stdout
+        # Procura por Tctl ou Package id 0 (típico para CPUs Intel)
+        match = re.search(r'(Tctl|Package id 0):\s*\+(\d+\.\d)°C', output)
+        if match:
+            return f"{match.group(2)}C"
+        return "N/A"
+    except subprocess.CalledProcessError:
+        return "Erro: sensors não instalado"
+    except Exception as e:
+        return f"Erro: {str(e)}"
+
 # =================== GUI =====================
 app = tk.Tk()
 app.title("Gerenciador de Energia e Monitoramento")
-app.geometry("600x520")
+app.geometry("600x600")
 app.resizable(False, False)
 
 # Configurações de tema para a janela principal
-app.configure(bg=BG_DARK) # Define o fundo da janela principal
+app.configure(bg=BG_DARK)
 
 # Ícone
 try:
@@ -95,42 +125,38 @@ style.theme_use("clam")
 style.configure(".", background=BG_DARK, foreground=FG_LIGHT, font=("Segoe UI", 10))
 style.configure("TLabel", background=BG_DARK, foreground=FG_LIGHT)
 style.configure("TButton", background=ACCENT_COLOR, foreground="black", font=("Segoe UI", 10, "bold"), borderwidth=0)
-style.map("TButton", background=[("active", "#4d90fe")]) # Cor ao passar o mouse
+style.map("TButton", background=[("active", "#4d90fe")])
 style.configure("TCheckbutton", background=BG_DARK, foreground=FG_LIGHT)
-style.configure("TLabelframe", background=FRAME_BG, foreground=FG_LIGHT)
+style.configure("TLabelframe", background=FRAME_BG, foreground=FG_LIGHT, font=("Segoe UI", 11, "bold"))
 style.configure("TLabelframe.Label", background=FRAME_BG, foreground=FG_LIGHT, font=("Segoe UI", 11, "bold"))
+style.configure("Monitor.TFrame", background=FRAME_BG)
+style.configure("Monitor.TLabel", background=FRAME_BG, foreground=FG_LIGHT, font=("Segoe UI", 11))
+style.configure("Title.Monitor.TLabel", font=("Segoe UI", 12, "bold"), foreground="#1abc9c")
+style.configure("Value.Monitor.TLabel", font=("Consolas", 11, "bold"), foreground=ACCENT_COLOR)
 
 # Frame perfis
 frame_perfil = ttk.LabelFrame(app, text="Perfis de Energia")
 frame_perfil.pack(pady=10, padx=10, fill="x")
 
-# --- NOVO CÓDIGO PARA CENTRALIZAR OS BOTÕES ---
-# Crie um Frame interno para agrupar e centralizar os botões
+# Frame interno para centralizar os botões
 buttons_frame = ttk.Frame(frame_perfil)
-buttons_frame.pack(pady=5) # Centraliza o frame de botões dentro do frame_perfil
+buttons_frame.pack(pady=5)
 
-# Adicione os botões dentro do novo frame, usando side="left" para mantê-los lado a lado
+# Botões
 ttk.Button(buttons_frame, text="🚀 Turbo", width=12, command=lambda: aplicar_perfil("Turbo")).pack(side="left", padx=5, pady=5)
 ttk.Button(buttons_frame, text="⚙️ Padrão", width=12, command=lambda: aplicar_perfil("Padrao")).pack(side="left", padx=5, pady=5)
 ttk.Button(buttons_frame, text="🔋 Economia", width=12, command=lambda: aplicar_perfil("Economia")).pack(side="left", padx=5, pady=5)
 ttk.Button(buttons_frame, text="🤖 Auto", width=12, command=lambda: aplicar_perfil("Auto")).pack(side="left", padx=5, pady=5)
-# --- FIM DO NOVO CÓDIGO ---
 
 # Wine puro
 ttk.Checkbutton(app, text="Habilitar Wine Puro", variable=wine_var, command=toggle_wine).pack(pady=5)
-ttk.Label(app, text="Se ativado, jogos via Wine puro serão detectados\nquando em TURBO ou PADRÃO.").pack()
-ttk.Label(app, textvariable=status_var, foreground=ACCENT_COLOR).pack(pady=5) # Use a cor de destaque para o status
+ttk.Label(app, text="Se ativado, jogos via Wine puro & Proton-GE (P/ Jogos Não Steam) serão detectados\nquando em TURBO ou PADRÃO.").pack()
+ttk.Label(app, textvariable=status_var, foreground=ACCENT_COLOR).pack(pady=5)
 ttk.Label(app, text="⚙️ Mudança de perfil imediata.").pack()
 
-# Frame monitoramento embutido (substitui botões)
+# Frame monitoramento
 frame_monitor = ttk.LabelFrame(app, text="Monitor de Estado Atual")
 frame_monitor.pack(pady=10, padx=10, fill="x")
-
-# Inserindo monitor do algoritmo 2
-style.configure("Monitor.TFrame", background=FRAME_BG)
-style.configure("Monitor.TLabel", background=FRAME_BG, foreground=FG_LIGHT, font=("Segoe UI", 11))
-style.configure("Title.Monitor.TLabel", font=("Segoe UI", 12, "bold"), foreground="#1abc9c")
-style.configure("Value.Monitor.TLabel", font=("Consolas", 11, "bold"), foreground=ACCENT_COLOR)
 
 monitor_frame = ttk.Frame(frame_monitor, style="Monitor.TFrame")
 monitor_frame.pack(fill="both", expand=True)
@@ -149,10 +175,16 @@ pcie_title.pack(anchor="center")
 pcie_label = ttk.Label(monitor_frame, text="--", style="Value.Monitor.TLabel")
 pcie_label.pack(anchor="center", pady=(0, 10))
 
-freq_title = ttk.Label(monitor_frame, text="Média Frequência CPU", style="Title.Monitor.TLabel")
+freq_title = ttk.Label(monitor_frame, text="Frequência Média da CPU", style="Title.Monitor.TLabel")
 freq_title.pack(anchor="center")
 avg_freq_label = ttk.Label(monitor_frame, text="-- MHz", style="Value.Monitor.TLabel")
-avg_freq_label.pack(anchor="center")
+avg_freq_label.pack(anchor="center", pady=(0, 10))
+
+# Labels para monitoramento da GPU
+gpu_title = ttk.Label(monitor_frame, text="Uso da GPU", style="Title.Monitor.TLabel")
+gpu_title.pack(anchor="center")
+gpu_label = ttk.Label(monitor_frame, text="N/A", style="Value.Monitor.TLabel")
+gpu_label.pack(anchor="center", pady=(0, 10))
 
 def read_file(path):
     try:
@@ -161,9 +193,13 @@ def read_file(path):
     except Exception as e:
         return "Erro ao ler"
 
+# ALTERADO: Função update_monitor para incluir temperatura da CPU
 def update_monitor():
+    # Atualiza CPU Governor
     governor_label.config(text=read_file(cpu_governor_path))
+    # Atualiza PCIe Policy
     pcie_label.config(text=read_file(pcie_policy_path))
+    # Atualiza Frequência Média da CPU e Temperatura
     total_freq = 0
     count = 0
     for path in cpu_freq_paths:
@@ -177,11 +213,16 @@ def update_monitor():
             pass
     if count > 0:
         avg_freq = total_freq / count
-        avg_freq_label.config(text=f"{avg_freq:.2f} MHz")
+        temp = get_cpu_temp()
+        avg_freq_label.config(text=f"{avg_freq:.2f} MHz ({temp})")
     else:
         avg_freq_label.config(text="Erro ao calcular")
-    app.after(3000, update_monitor)
+    # Atualiza Uso e Temperatura da GPU
+    gpu_label.config(text=get_gpu_usage())
+    # Atualiza a cada 1 segundo (1000ms)
+    app.after(1000, update_monitor)
 
+# Inicia o monitoramento automaticamente
 update_monitor()
 
 app.mainloop()
