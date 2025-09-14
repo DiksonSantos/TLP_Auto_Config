@@ -30,7 +30,7 @@ def gerenciar_slideshow_cinnamon():
             return False
 
     # Critérios de detecção de jogos
-    chaves_proton = ["steamapps", "proton", "Proton", "Proton-GE", "wine", "dxvk", "gamescope"]
+    chaves_proton = ["steamapps", "proton", "Proton", "Proton-GE", "wine", "dxvk", "gamescope", "rpcs3","pcsx2"]
     chaves_nativas = ["libGL.so", "libvulkan.so", "vulkan", "OpenGL", "SDL2", "godot", "love", "unity", "unreal", "metro", "Yuzu", "mpv", "mednafen"]
 
 

@@ -1,17 +1,64 @@
 #!/usr/bin/env python3
 # coding: utf-8
-
+from Key import senha
 import subprocess
 import time
 import os
-from Padrao import determine_governor, apply_pcie_policy
+from Economia import determine_governor, apply_pcie_policy
+
 
 def is_steam_game_running():
-    result = subprocess.run(["ps", "-eo", "pid,cmd"], stdout=subprocess.PIPE, text=True)
-    for line in result.stdout.splitlines():
-        if "steamapps/common" in line:
-            return True
+    """
+    Verifica se um jogo de 64 bits da Steam está rodando,
+    filtrando jogos de 32 bits.
+    """
+    try:
+        # Comando para listar todos os processos e seus caminhos
+        result = subprocess.run(["ps", "-eo", "pid,cmd"], stdout=subprocess.PIPE, text=True)
+        if result.returncode != 0:
+            return False
+
+        # Itera sobre cada processo
+        for line in result.stdout.splitlines():
+            line_parts = line.strip().split()
+            if len(line_parts) < 2:
+                continue
+
+            # O primeiro elemento é o PID, o resto é o comando
+            pid = line_parts[0]
+            cmd = " ".join(line_parts[1:])
+
+            # Verifica se o processo é de um jogo Steam, Ou jogos fora da Steam que use o GE-Proton
+            if "steamapps/common" in cmd or "steamapps/compatdata" in cmd or "compatibilitytools.d" in cmd:
+                # Tenta encontrar o caminho do executável.
+                # Geralmente é a primeira parte do comando.
+                exe_path = cmd.split()[0]
+                if not os.path.exists(exe_path):
+                    continue
+
+                # Usa o comando 'file' para verificar a arquitetura
+                try:
+                    file_result = subprocess.run(["file", exe_path], stdout=subprocess.PIPE, text=True)
+                    if "ELF 64-bit" in file_result.stdout:
+                        print(f"Jogo 64-bit detectado: {exe_path}")
+                        return True
+                    else:
+                        #print(f"Processo detectado, mas não é 64-bit: {exe_path}")
+                        pass
+                except FileNotFoundError:
+                    # 'file' não está instalado. Não é possível verificar a arquitetura, então retorna False
+                    # ou decide retornar True para não interromper a funcionalidade base.
+                    print("Atenção: Comando 'file' não encontrado. Não é possível verificar a arquitetura dos jogos.")
+                    # Como não podemos confirmar, vamos ser conservadores e retornar False para não ligar o modo de performance
+                    # para jogos 32-bit por engano.
+                    return False
+
+    except Exception as e:
+        print(f"Ocorreu um erro: {e}")
+        return False
+
     return False
+
 
 
 
@@ -31,45 +78,12 @@ def fix_log_permissions(password):
     else:
         print(f"❌ Erro ao corrigir permissões do log: {result.stderr}")
 
-# def is_any_steam_game_running():
-#     try:
-#         from WinePuro import is_proton_game_running
-#         return is_steam_game_running() or is_proton_game_running()
-#     except ImportError:
-#         return is_steam_game_running()
-
-
 def is_any_steam_game_running():
-    def is_steam_game_running():
-        result = subprocess.run(["pgrep", "-f", "steamapps"], stdout=subprocess.DEVNULL)
-        return result.returncode == 0
-
     try:
         from WinePuro import is_proton_game_running
-        game_running = is_steam_game_running() or is_proton_game_running()
+        return is_steam_game_running() or is_proton_game_running()
     except ImportError:
-        game_running = is_steam_game_running()
-
-    try:
-        # Verifica se o slideshow está ligado ou desligado
-        slideshow_status = subprocess.check_output([
-            "gsettings", "get", "org.cinnamon.desktop.background.slideshow", "slideshow-enabled"
-        ]).decode("utf-8").strip()
-
-        if game_running and slideshow_status == "true":
-            subprocess.run([
-                "gsettings", "set", "org.cinnamon.desktop.background.slideshow", "slideshow-enabled", "false"
-            ])
-        elif not game_running and slideshow_status == "false":
-            subprocess.run([
-                "gsettings", "set", "org.cinnamon.desktop.background.slideshow", "slideshow-enabled", "true"
-            ])
-
-    except Exception as e:
-        print(f"Erro ao controlar slideshow: {e}")
-
-    return game_running
-
+        return is_steam_game_running()
 
 def get_power_state(password):
     """Retorna 'on_ac' se conectado na tomada, ou 'on_battery'."""
@@ -150,5 +164,5 @@ def set_cpu_governor(password):
         print(f"Erro inesperado: {e}")
 
 if __name__ == "__main__":
-    user_password = 'SuaSenha_Aqui'  # substitua por input() se quiser interativo
+    user_password = senha  # substitua por input() se quiser interativo
     set_cpu_governor(user_password)
