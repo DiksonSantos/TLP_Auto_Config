@@ -12,8 +12,8 @@ ICON_PERFIL = "/home/dikson/Features/Icones/Perfil_Energia.png"
 ICON_MONITOR = "/home/dikson/Features/Icones/Power_Monitor_config.png"
 
 # Cores para o tema escuro
-BG_DARK = "#282c34"  # Cor de fundo principal
-FG_LIGHT = "#abb2bf"  # Cor do texto principal
+BG_DARK = "#282c34" # Cor de fundo principal
+FG_LIGHT = "#abb2bf" # Cor do texto principal
 ACCENT_COLOR = "#61afef" # Cor de destaque (para botões, por exemplo)
 FRAME_BG = "#3e4452" # Cor de fundo para frames
 
@@ -65,6 +65,7 @@ def is_any_steam_game_running():
     status_var.set("Configuração Wine atualizada.")
     messagebox.showinfo("✅ Sucesso", "Configuração Wine atualizada.\n\nReinicie o serviço systemd para aplicar.")
 
+# ALTERADO: get_gpu_usage para retornar uso e temperatura separadamente
 def get_gpu_usage():
     try:
         result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, check=True)
@@ -72,12 +73,12 @@ def get_gpu_usage():
         match = re.search(r'\|\s*N/A\s*(\d+C)\s*P\d\s*.*?(\d+%)\s*Default\s*\|', output)
         if match:
             temp, usage = match.groups()
-            return f"{usage} ({temp})"
-        return "N/A"
+            return usage, temp
+        return "N/A", "N/A"
     except subprocess.CalledProcessError:
-        return "Erro: nvidia-smi não instalado"
+        return "Erro", "Erro"
     except Exception as e:
-        return f"Erro: {str(e)}"
+        return "Erro", "Erro"
 
 # NOVO: Função para capturar a temperatura da CPU via lm-sensors
 def get_cpu_temp():
@@ -90,9 +91,9 @@ def get_cpu_temp():
             return f"{match.group(2)}C"
         return "N/A"
     except subprocess.CalledProcessError:
-        return "Erro: sensors não instalado"
+        return "Erro", "Erro"
     except Exception as e:
-        return f"Erro: {str(e)}"
+        return "Erro", "Erro"
 
 # =================== GUI =====================
 app = tk.Tk()
@@ -133,6 +134,9 @@ style.configure("Monitor.TFrame", background=FRAME_BG)
 style.configure("Monitor.TLabel", background=FRAME_BG, foreground=FG_LIGHT, font=("Segoe UI", 11))
 style.configure("Title.Monitor.TLabel", font=("Segoe UI", 12, "bold"), foreground="#1abc9c")
 style.configure("Value.Monitor.TLabel", font=("Consolas", 11, "bold"), foreground=ACCENT_COLOR)
+# NOVO: Estilo para texto de alerta
+style.configure("Alert.TLabel", foreground="red")
+
 
 # Frame perfis
 frame_perfil = ttk.LabelFrame(app, text="Perfis de Energia")
@@ -165,26 +169,26 @@ cpu_governor_path = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
 pcie_policy_path = "/sys/module/pcie_aspm/parameters/policy"
 cpu_freq_paths = sorted(glob.glob("/sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq"))
 
+# REORDENADO: Ordem de exibição dos widgets
 governor_title = ttk.Label(monitor_frame, text="CPU Scaling Governor", style="Title.Monitor.TLabel")
 governor_title.pack(anchor="center")
 governor_label = ttk.Label(monitor_frame, text="--", style="Value.Monitor.TLabel")
 governor_label.pack(anchor="center", pady=(0, 10))
-
-pcie_title = ttk.Label(monitor_frame, text="PCIe Policy (NVMe)", style="Title.Monitor.TLabel")
-pcie_title.pack(anchor="center")
-pcie_label = ttk.Label(monitor_frame, text="--", style="Value.Monitor.TLabel")
-pcie_label.pack(anchor="center", pady=(0, 10))
 
 freq_title = ttk.Label(monitor_frame, text="Frequência Média da CPU", style="Title.Monitor.TLabel")
 freq_title.pack(anchor="center")
 avg_freq_label = ttk.Label(monitor_frame, text="-- MHz", style="Value.Monitor.TLabel")
 avg_freq_label.pack(anchor="center", pady=(0, 10))
 
-# Labels para monitoramento da GPU
 gpu_title = ttk.Label(monitor_frame, text="Uso da GPU", style="Title.Monitor.TLabel")
 gpu_title.pack(anchor="center")
 gpu_label = ttk.Label(monitor_frame, text="N/A", style="Value.Monitor.TLabel")
 gpu_label.pack(anchor="center", pady=(0, 10))
+
+pcie_title = ttk.Label(monitor_frame, text="PCIe Policy (NVMe)", style="Title.Monitor.TLabel")
+pcie_title.pack(anchor="center")
+pcie_label = ttk.Label(monitor_frame, text="--", style="Value.Monitor.TLabel")
+pcie_label.pack(anchor="center", pady=(0, 10))
 
 def read_file(path):
     try:
@@ -193,12 +197,13 @@ def read_file(path):
     except Exception as e:
         return "Erro ao ler"
 
-# ALTERADO: Função update_monitor para incluir temperatura da CPU
+# ALTERADO: Função update_monitor para incluir temperatura da CPU e mudar cores
 def update_monitor():
     # Atualiza CPU Governor
     governor_label.config(text=read_file(cpu_governor_path))
     # Atualiza PCIe Policy
     pcie_label.config(text=read_file(pcie_policy_path))
+
     # Atualiza Frequência Média da CPU e Temperatura
     total_freq = 0
     count = 0
@@ -211,14 +216,33 @@ def update_monitor():
                 count += 1
         except Exception as e:
             pass
+
+    temp = get_cpu_temp()
+    temp_val = float(re.sub(r'[^\d.]', '', temp)) if temp != "N/A" else 0
+
     if count > 0:
         avg_freq = total_freq / count
-        temp = get_cpu_temp()
+        # NOVO: Muda a cor da frequência da CPU se a temperatura for alta
+        if temp_val >= 90:
+            avg_freq_label.config(foreground="red")
+        else:
+            avg_freq_label.config(foreground=ACCENT_COLOR)
         avg_freq_label.config(text=f"{avg_freq:.2f} MHz ({temp})")
     else:
         avg_freq_label.config(text="Erro ao calcular")
+
     # Atualiza Uso e Temperatura da GPU
-    gpu_label.config(text=get_gpu_usage())
+    gpu_usage, gpu_temp = get_gpu_usage()
+    gpu_temp_val = float(re.sub(r'[^\d.]', '', gpu_temp)) if gpu_temp != "N/A" else 0
+
+    # NOVO: Muda a cor da temperatura da GPU se a temperatura for alta
+    if gpu_temp_val >= 85:
+        gpu_label.config(foreground="red")
+    else:
+        gpu_label.config(foreground=ACCENT_COLOR)
+
+    gpu_label.config(text=f"{gpu_usage} ({gpu_temp})")
+
     # Atualiza a cada 1 segundo (1000ms)
     app.after(1000, update_monitor)
 
