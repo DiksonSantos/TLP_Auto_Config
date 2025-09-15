@@ -1,0 +1,80 @@
+A lógica agora fica: o gamemoded chama o script com argumentos (start/end e PID). O script só liga/desliga o slideshow.
+
+Aqui está teu código adaptado:
+
+**O Proton, por padrão, já integra o gamemode quando detecta que ele está instalado no sistema.**
+Então não precisa apontar 'gamemoderun' se o jogo Usar PROTON. 
+_________________
+
+#!/usr/bin/env python3
+import subprocess
+import sys
+from datetime import datetime
+
+
+def set_slideshow(enable: bool):
+    """Ativa ou desativa o slideshow no Cinnamon."""
+    valor = "true" if enable else "false"
+    subprocess.run([
+        "gsettings", "set",
+        "org.cinnamon.desktop.background.slideshow",
+        "slideshow-enabled", valor
+    ])
+    # estado = "ativado" if enable else "desativado"
+    # agora = datetime.now().strftime("[%H:%M:%S]")
+    # print(f"🎞️ Slideshow {estado}: {agora}")
+    pass
+
+
+def main():
+    """
+    Script chamado pelo gamemoded.
+    Args esperados:
+      - sys.argv[1] = "start" ou "end"
+      - sys.argv[2] = PID do jogo
+    """
+    if len(sys.argv) < 3:
+        # print("Uso: gamemode_proccallback.py <start|end> <pid>")
+        sys.exit(1)
+
+    acao, pid = sys.argv[1], sys.argv[2]
+
+    if acao == "start":
+        # print(f"🔕 Jogo iniciado (PID {pid}).")
+        set_slideshow(False)
+        pass
+    elif acao == "end":
+        # print(f"✅ Jogo finalizado (PID {pid}).")
+        set_slideshow(True)
+        pass
+    else:
+        # print(f"Ação desconhecida: {acao}")
+        sys.exit(1)
+        pass
+
+
+if __name__ == "__main__":
+    main()
+
+_______________________________
+
+1 - Dê permissão de execução:
+sudo chmod +x /usr/libexec/gamemode_proccallback.py
+
+2 - Salve esse script em:
+/usr/libexec/gamemode_proccallback.py
+
+3 - Aponte o gamemode para chamar esse script.
+Crie/Edite -> /etc/gamemode.ini e adicione:
+
+[general]
+# Script a ser chamado quando um jogo inicia/termina
+proccallback = /usr/libexec/gamemode_proccallback.py
+
+4 - Reinicie o gamemoded (Não Pode Rodar este Comando como ROOT:
+systemctl --user restart gamemoded
+
+5 - Agora, qualquer jogo iniciado com:
+gamemoderun <comando-do-jogo>
+
+

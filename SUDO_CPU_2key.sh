@@ -129,8 +129,8 @@ def fix_brightness_permission(password):
 
 def set_cpu_governor(password):
     try:
-        for i in range(2):
-            print(f"\n[{i+1}/2] Verificando estado...")
+        for i in range(1):
+            print(f"\n[{i+1}/1] Verificando estado...")
 
             power_state = get_power_state(password)
             if power_state is None:
