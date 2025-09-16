@@ -103,7 +103,7 @@ def get_gpu_power_draw():
             capture_output=True, text=True, check=True
         )
         power = result.stdout.strip()
-        return f"{float(power):.2f} W"
+        return f"{float(power):.2f}"
     except subprocess.CalledProcessError:
         return "Erro"
     except Exception as e:
@@ -200,12 +200,12 @@ gpu_label = ttk.Label(monitor_frame, text="N/A", style="Value.Monitor.TLabel")
 gpu_label.pack(anchor="center", pady=(0, 0))
 
 # NOVO: Rótulo para o consumo de energia da GPU
-gpu_power_label = ttk.Label(monitor_frame, text="-- Watts", style="Value.Monitor.TLabel")
+gpu_power_label = ttk.Label(monitor_frame, text="-- W", style="Value.Monitor.TLabel")
 gpu_power_label.pack(anchor="center", pady=(0, 10))
 
 pcie_title = ttk.Label(monitor_frame, text="PCIe Policy (NVMe)", style="Title.Monitor.TLabel")
 pcie_title.pack(anchor="center")
-pcie_label = ttk.Label(monitor_frame, text="--", style="Value.Monitor.TLabel", justify="center") # Alterado para garantir a centralização
+pcie_label = ttk.Label(monitor_frame, text="--", style="Value.Monitor.TLabel", justify="center")
 pcie_label.pack(anchor="center", pady=(0, 0))
 
 def read_file(path):
@@ -222,7 +222,6 @@ def update_monitor():
     # Atualiza PCIe Policy e Velocidade do Link em linhas separadas
     policy = read_file(pcie_policy_path)
     speed = read_file(pcie_speed_path)
-    #pcie_label.config(text=f"{policy}\n{speed}")
     pcie_label.config(text=f"{policy}\nVelocidade: {speed}")
 
     # Atualiza Frequência Média da CPU e Temperatura
@@ -258,13 +257,11 @@ def update_monitor():
 
     if gpu_temp_val >= 85:
         gpu_label.config(foreground="red")
-        gpu_power_label.config(foreground="red")
     else:
         gpu_label.config(foreground=ACCENT_COLOR)
-        gpu_power_label.config(foreground=ACCENT_COLOR)
 
     gpu_label.config(text=f"{gpu_usage} ({gpu_temp})")
-    gpu_power_label.config(text=f"Consumo: {gpu_power}atts")
+    gpu_power_label.config(text=f"Consumo: {gpu_power} Watts")
 
 
     # Atualiza a cada 1 segundo (1000ms)
