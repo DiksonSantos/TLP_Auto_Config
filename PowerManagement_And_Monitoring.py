@@ -95,6 +95,20 @@ def get_cpu_temp():
     except Exception as e:
         return "Erro", "Erro"
 
+# NOVO: Função para capturar o consumo de energia da GPU
+def get_gpu_power_draw():
+    try:
+        result = subprocess.run(
+            ['nvidia-smi', '--query-gpu=power.draw', '--format=csv,noheader,nounits'],
+            capture_output=True, text=True, check=True
+        )
+        power = result.stdout.strip()
+        return f"{float(power):.2f} W"
+    except subprocess.CalledProcessError:
+        return "Erro"
+    except Exception as e:
+        return "Erro"
+
 # =================== GUI =====================
 app = tk.Tk()
 app.title("Gerenciador de Energia e Monitoramento")
@@ -163,13 +177,13 @@ frame_monitor = ttk.LabelFrame(app, text="Monitor de Estado Atual")
 frame_monitor.pack(pady=10, padx=10, fill="x")
 
 monitor_frame = ttk.Frame(frame_monitor, style="Monitor.TFrame")
-monitor_frame.pack(fill="both", expand=True)
+monitor_frame.pack(fill="both", expand=False)
 
 cpu_governor_path = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
 pcie_policy_path = "/sys/module/pcie_aspm/parameters/policy"
+pcie_speed_path = "/sys/bus/pci/devices/0000:01:00.0/current_link_speed"
 cpu_freq_paths = sorted(glob.glob("/sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq"))
 
-# REORDENADO: Ordem de exibição dos widgets
 governor_title = ttk.Label(monitor_frame, text="CPU Scaling Governor", style="Title.Monitor.TLabel")
 governor_title.pack(anchor="center")
 governor_label = ttk.Label(monitor_frame, text="--", style="Value.Monitor.TLabel")
@@ -183,12 +197,16 @@ avg_freq_label.pack(anchor="center", pady=(0, 10))
 gpu_title = ttk.Label(monitor_frame, text="Uso da GPU", style="Title.Monitor.TLabel")
 gpu_title.pack(anchor="center")
 gpu_label = ttk.Label(monitor_frame, text="N/A", style="Value.Monitor.TLabel")
-gpu_label.pack(anchor="center", pady=(0, 10))
+gpu_label.pack(anchor="center", pady=(0, 0))
+
+# NOVO: Rótulo para o consumo de energia da GPU
+gpu_power_label = ttk.Label(monitor_frame, text="-- Watts", style="Value.Monitor.TLabel")
+gpu_power_label.pack(anchor="center", pady=(0, 10))
 
 pcie_title = ttk.Label(monitor_frame, text="PCIe Policy (NVMe)", style="Title.Monitor.TLabel")
 pcie_title.pack(anchor="center")
-pcie_label = ttk.Label(monitor_frame, text="--", style="Value.Monitor.TLabel")
-pcie_label.pack(anchor="center", pady=(0, 10))
+pcie_label = ttk.Label(monitor_frame, text="--", style="Value.Monitor.TLabel", justify="center") # Alterado para garantir a centralização
+pcie_label.pack(anchor="center", pady=(0, 0))
 
 def read_file(path):
     try:
@@ -197,12 +215,15 @@ def read_file(path):
     except Exception as e:
         return "Erro ao ler"
 
-# ALTERADO: Função update_monitor para incluir temperatura da CPU e mudar cores
 def update_monitor():
     # Atualiza CPU Governor
     governor_label.config(text=read_file(cpu_governor_path))
-    # Atualiza PCIe Policy
-    pcie_label.config(text=read_file(pcie_policy_path))
+
+    # Atualiza PCIe Policy e Velocidade do Link em linhas separadas
+    policy = read_file(pcie_policy_path)
+    speed = read_file(pcie_speed_path)
+    #pcie_label.config(text=f"{policy}\n{speed}")
+    pcie_label.config(text=f"{policy}\nVelocidade: {speed}")
 
     # Atualiza Frequência Média da CPU e Temperatura
     total_freq = 0
@@ -222,7 +243,6 @@ def update_monitor():
 
     if count > 0:
         avg_freq = total_freq / count
-        # NOVO: Muda a cor da frequência da CPU se a temperatura for alta
         if temp_val >= 90:
             avg_freq_label.config(foreground="red")
         else:
@@ -231,17 +251,21 @@ def update_monitor():
     else:
         avg_freq_label.config(text="Erro ao calcular")
 
-    # Atualiza Uso e Temperatura da GPU
+    # Atualiza Uso, Temperatura e Consumo da GPU
     gpu_usage, gpu_temp = get_gpu_usage()
+    gpu_power = get_gpu_power_draw()
     gpu_temp_val = float(re.sub(r'[^\d.]', '', gpu_temp)) if gpu_temp != "N/A" else 0
 
-    # NOVO: Muda a cor da temperatura da GPU se a temperatura for alta
     if gpu_temp_val >= 85:
         gpu_label.config(foreground="red")
+        gpu_power_label.config(foreground="red")
     else:
         gpu_label.config(foreground=ACCENT_COLOR)
+        gpu_power_label.config(foreground=ACCENT_COLOR)
 
     gpu_label.config(text=f"{gpu_usage} ({gpu_temp})")
+    gpu_power_label.config(text=f"Consumo: {gpu_power}atts")
+
 
     # Atualiza a cada 1 segundo (1000ms)
     app.after(1000, update_monitor)
