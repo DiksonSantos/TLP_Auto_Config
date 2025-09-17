@@ -2,14 +2,16 @@ import subprocess
 import os
 
 def is_proton_game_running():
-    """Detecta Proton (ou wine) e emuladores PCSX2/RPCS3.
-       Ignora processos Wine de 32-bit."""
+    """
+    Detecta jogos de 64-bit (via Steam/Proton/Wine) e emuladores.
+    Ignora processos de 32-bit ou o cliente Steam principal.
+    """
     result = subprocess.run(["ps", "-eo", "pid,cmd"], capture_output=True, text=True)
     if result.returncode != 0:
         return False
 
     for line in result.stdout.splitlines():
-        if line.strip().startswith("PID"):  # pular cabeçalho
+        if line.strip().startswith("PID"):
             continue
 
         parts = line.strip().split(None, 1)
@@ -17,32 +19,73 @@ def is_proton_game_running():
             continue
 
         pid, cmd = parts
-        exe_path = f"/proc/{pid}/exe"
         ll = cmd.lower()
 
+        # Verifica processos que podem ser jogos/emuladores.
         if any(substr in ll for substr in (
             "steamapps/compatdata",
-            "wine",
             "proton",
             "pcsx2",
             "rpcs3"
-        )):
+        )) or ("wine" in ll and "steamclient" not in ll): # Exclui processos como steamclient.exe que são 32bits
+
+            # Executa a verificação de arquitetura
             try:
+                exe_path = f"/proc/{pid}/exe"
                 file_output = subprocess.check_output(["file", exe_path], text=True)
 
-                # Ignora Wine 32-bit
-                if "wine" in ll and "32-bit" in file_output:
-                    continue
-
-                # Aceita se for 64-bit Wine ou se for emulador
                 if "64-bit" in file_output or "pcsx2" in ll or "rpcs3" in ll:
+                    # Se for um processo 64-bit ou um emulador, consideramos um jogo válido.
                     return True
 
             except Exception:
-                # /proc/<pid>/exe pode falhar (permissão, processo fechando, etc.)
                 continue
 
     return False
+
+
+# def is_proton_game_running():
+#     """Detecta Proton (ou wine) e emuladores PCSX2/RPCS3.
+#        Ignora processos Wine de 32-bit."""
+#     result = subprocess.run(["ps", "-eo", "pid,cmd"], capture_output=True, text=True)
+#     if result.returncode != 0:
+#         return False
+#
+#     for line in result.stdout.splitlines():
+#         if line.strip().startswith("PID"):  # pular cabeçalho
+#             continue
+#
+#         parts = line.strip().split(None, 1)
+#         if len(parts) < 2:
+#             continue
+#
+#         pid, cmd = parts
+#         exe_path = f"/proc/{pid}/exe"
+#         ll = cmd.lower()
+#
+#         if any(substr in ll for substr in (
+#             "steamapps/compatdata",
+#             "wine",
+#             "proton",
+#             "pcsx2",
+#             "rpcs3"
+#         )):
+#             try:
+#                 file_output = subprocess.check_output(["file", exe_path], text=True)
+#
+#                 # Ignora Wine 32-bit
+#                 if "wine" in ll and "32-bit" in file_output:
+#                     continue
+#
+#                 # Aceita se for 64-bit Wine ou se for emulador
+#                 if "64-bit" in file_output or "pcsx2" in ll or "rpcs3" in ll:
+#                     return True
+#
+#             except Exception:
+#                 # /proc/<pid>/exe pode falhar (permissão, processo fechando, etc.)
+#                 continue
+#
+#     return False
 
 
 # def is_proton_game_running():
