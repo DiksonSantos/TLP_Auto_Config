@@ -43,6 +43,11 @@ def is_proton_game_running():
 
     return False
 
+"""
+Se a prioridade for performance a versão ativa (a cima) é preferível.
+A versão def a baixo usaria mais ciclos e verificações/processamento.
+"""
+
 
 # def is_proton_game_running():
 #     """Detecta Proton (ou wine) e emuladores PCSX2/RPCS3.
@@ -86,7 +91,6 @@ def is_proton_game_running():
 #                 continue
 #
 #     return False
-
 
 # def is_proton_game_running():
 #     """Pega programas que usam Wine Puro."""

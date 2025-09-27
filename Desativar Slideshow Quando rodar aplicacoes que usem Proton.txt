@@ -1,3 +1,68 @@
+PERSONALIZANDO OS ATALHOS DE JOGOS E APLICAÇÕES  (Crie um atalho .sh); 
+
+#!/bin/bash
+
+# Define prefixo específico para o jogo
+export WINEPREFIX="$HOME/.wine-jogo"
+
+# Desliga slideshow
+gsettings set org.cinnamon.desktop.background.slideshow slideshow-enabled false
+
+# Define resolução baixa apenas no monitor do notebook
+xrandr --output eDP-1 --mode 640x480 --rate 59.93
+
+# Executa o jogo
+#gamemoderun wine "/opt/Swarm_Assault/Swarm_Assault.exe"
+wine "/opt/Swarm_Assault/Swarm_Assault.exe"
+
+# Após o jogo fechar, restaura resolução e posição dos monitores
+xrandr \
+  --output eDP-1 --mode 1920x1080 --rate 144 --primary \
+  --output HDMI-1-0 --mode 1280x1024 --rate 60 --right-of eDP-1
+
+  # Após o jogo fechar, religa slideshow
+gsettings set org.cinnamon.desktop.background.slideshow slideshow-enabled true
+sct 3500
+
+___________________________________________________________________________________________________________________________
+USANDO SCRIPT SIMPLES;
+
+CRIE O SCRIPT 'slideshow-control'
+
+CONTEUDO;
+
+#!/bin/bash
+
+# Desliga slideshow
+gsettings set org.cinnamon.desktop.background.slideshow slideshow-enabled false
+
+# Executa o comando completo que foi passado para o script
+"$@"
+
+# Guarda o status de saída do comando
+status=$?
+
+# Religa slideshow
+gsettings set org.cinnamon.desktop.background.slideshow slideshow-enabled true
+
+exit $status
+
+
+
+PERMISSÃO & LOCAL DE FUNCIONAMENTO;
+-> chmod +x ~/.local/bin/slideshow-control
+
+
+COMO USAR;
+slideshow-control wine MaxPayne.exe
+
+STEAM LAUNCHER;
+env PROTON_ENABLE_NVAPI=1 PROTON_ENABLE_NVAPI_SECRET=1 __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ~/.local/bin/slideshow-control %command%
+
+
+_______________________________________________________________________________________________________________________________
+USANDO GAMEMODERUN:
+
 A lógica agora fica: o gamemoded chama o script com argumentos (start/end e PID). O script só liga/desliga o slideshow.
 
 Aqui está teu código adaptado:
@@ -65,7 +130,8 @@ sudo chmod +x /usr/libexec/gamemode_proccallback.py
 /usr/libexec/gamemode_proccallback.py
 
 3 - Aponte o gamemode para chamar esse script.
-Crie/Edite -> /etc/gamemode.ini e adicione:
+#####Crie/Edite -> /etc/gamemode.ini e adicione:
+Crie -> ~/.config/gamemode.ini
 
 [general]
 # Script a ser chamado quando um jogo inicia/termina
