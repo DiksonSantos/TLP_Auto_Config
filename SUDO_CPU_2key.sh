@@ -115,6 +115,23 @@ def apply_governor(password, governor):
     )
     return result.returncode == 0, result.stderr
 
+
+def fix_rapl_permission(password):
+    """Muda o dono do arquivo de energia da CPU para o usuário atual."""
+    cmd = "chown dikson:dikson /sys/class/powercap/intel-rapl:0/energy_uj"
+    result = subprocess.run(
+        ["sudo", "-S", "bash", "-c", cmd],
+        input=f"{password}\n",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode == 0:
+        print("✅ Permissão do energy_uj corrigida (dono alterado).")
+    else:
+        print(f"❌ Erro ao corrigir permissões: {result.stderr}")
+
+
 def fix_brightness_permission(password):
     """Corrige a propriedade do arquivo de brilho da tela (opcional)."""
     cmd = "chown dikson:dikson /sys/class/backlight/intel_backlight/brightness"
@@ -166,3 +183,4 @@ def set_cpu_governor(password):
 if __name__ == "__main__":
     user_password = senha  # substitua por input() se quiser interativo
     set_cpu_governor(user_password)
+    fix_rapl_permission(user_password)

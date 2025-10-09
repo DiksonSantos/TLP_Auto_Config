@@ -17,8 +17,45 @@ FG_LIGHT = "#abb2bf"  # Cor do texto principal
 ACCENT_COLOR = "#61afef"  # Cor de destaque
 FRAME_BG = "#3e4452"  # Cor de fundo para frames
 
+# =================== Variáveis Globais para Potência da CPU (NOVAS) =====================
+# Variáveis para cálculo de potência de forma não-bloqueante (eliminando time.sleep)
+LAST_ENERGY_READING = 0
+LAST_READING_TIME = 0.0
+
 # =================== Funções do Script =====================
 def ler_script():
+    # Verifica se o arquivo existe antes de tentar ler
+    if not os.path.exists(SCRIPT_PATH):
+         # Cria o arquivo com um conteúdo básico se não existir (para evitar erro)
+        conteudo_base = """
+def is_steam_game_running():
+    return False
+
+def determine_governor(is_game_running, is_on_ac):
+    return 'powersave'
+
+def apply_pcie_policy(is_game_running, is_on_ac):
+    pass
+
+def read_file(path):
+    try:
+        with open(path, "r") as f:
+            return f.read().strip()
+    except:
+        return ""
+
+from Padrao import determine_governor, apply_pcie_policy
+
+def is_any_steam_game_running():
+    return is_steam_game_running()
+
+if __name__ == '__main__':
+    pass
+"""
+        with open(SCRIPT_PATH, "w", encoding="utf-8") as file:
+             file.write(conteudo_base.strip())
+        return conteudo_base
+
     with open(SCRIPT_PATH, "r", encoding="utf-8") as file:
         return file.read()
 
@@ -104,6 +141,28 @@ def get_gpu_power_draw():
     except:
         return "Erro"
 
+# FUNÇÃO REVISADA PARA CAPTURAR AS TEMPERATURAS DOS DOIS NVMe
+def get_nvme_temps():
+    nvme_temps = {}
+    try:
+        result = subprocess.run(['sensors'], capture_output=True, text=True, check=True)
+        output = result.stdout
+
+        # Expressão regular que captura ID (e100 ou e200), a temperatura Composite e a crítica
+        matches = re.findall(r'(nvme-pci-e\d+).*?Composite:\s*\+(\d+\.\d)°C.*?\(crit = \+(\d+\.\d)°C\)', output, re.DOTALL)
+
+        for name, temp_val, crit_val in matches:
+            # Simplifica o nome para a GUI
+            simple_name = "NVMe 1" if "e100" in name else ("NVMe 2" if "e200" in name else name)
+            nvme_temps[simple_name] = {
+                'temp': float(temp_val),
+                'temp_str': f"+{temp_val}°C",
+                'crit': float(crit_val)
+            }
+        return nvme_temps
+    except:
+        return {} # Retorna dicionário vazio em caso de erro
+
 # =================== GUI =====================
 app = tk.Tk()
 app.title("Gerenciador de Energia e Monitoramento")
@@ -165,7 +224,6 @@ monitor_frame.pack(fill="both", expand=False)
 
 cpu_governor_path = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
 pcie_policy_path = "/sys/module/pcie_aspm/parameters/policy"
-# Ajuste o path da PCIe se for diferente no seu sistema
 pcie_speed_path = "/sys/bus/pci/devices/0000:01:00.0/current_link_speed"
 cpu_freq_paths = sorted(glob.glob("/sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq"))
 
@@ -179,16 +237,24 @@ freq_title = ttk.Label(monitor_frame, text="Frequência Média da CPU", style="T
 freq_title.pack(anchor="center")
 
 # Frame para agrupar Frequência e Temperatura da CPU
+# **Mantenha APENAS Frequência e Temperatura aqui.**
 cpu_frame = ttk.Frame(monitor_frame, style="Monitor.TFrame")
-cpu_frame.pack(anchor="center", pady=(0, 10))
+cpu_frame.pack(anchor="center", pady=(0, 5)) # Reduzi o pady para aproximar da potência
 
 # Label APENAS para a Frequência
 avg_freq_label = ttk.Label(cpu_frame, text="-- MHz", style="Value.Monitor.TLabel")
 avg_freq_label.pack(side="left", padx=5)
+avg_freq_label.pack(anchor="center", pady=(5, 0)) # Adicionei título
 
 # Label APENAS para a Temperatura da CPU (será colorida)
-cpu_temp_label = ttk.Label(cpu_frame, text="-- °C", style="Value.Monitor.TLabel")
+cpu_temp_label = ttk.Label(cpu_frame, text="(-- °C)", style="Value.Monitor.TLabel")
 cpu_temp_label.pack(side="left", padx=5)
+
+
+# Label APENAS para a Potência/Voltagem da CPU
+# **MOVIMENTO: Agora ele é empacotado diretamente no monitor_frame**
+cpu_power_label = ttk.Label(monitor_frame, text="-- W", style="Value.Monitor.TLabel")
+cpu_power_label.pack(anchor="center", pady=(0, 10)) # Com pady=(0, 10) para espaçar da GPU
 
 # --- Monitoramento da GPU ---
 gpu_title = ttk.Label(monitor_frame, text="Uso da GPU", style="Title.Monitor.TLabel")
@@ -209,11 +275,34 @@ gpu_temp_label.pack(side="left", padx=5)
 gpu_power_label = ttk.Label(monitor_frame, text="-- W", style="Value.Monitor.TLabel")
 gpu_power_label.pack(anchor="center", pady=(0, 10))
 
-# --- Monitoramento PCIe ---
+# --- Monitoramento PCIe e NVMe ---
 pcie_title = ttk.Label(monitor_frame, text="PCIe Policy (NVMe)", style="Title.Monitor.TLabel")
 pcie_title.pack(anchor="center")
-pcie_label = ttk.Label(monitor_frame, text="--", style="Value.Monitor.TLabel", justify="center")
-pcie_label.pack(anchor="center", pady=(0, 0))
+
+# Label APENAS para a política (ASPM)
+pcie_policy_label = ttk.Label(monitor_frame, text="--", style="Value.Monitor.TLabel")
+pcie_policy_label.pack(anchor="center", pady=(0, 5))
+
+# Frame para agrupar as Temperaturas NVMe
+nvme_temp_frame = ttk.Frame(monitor_frame, style="Monitor.TFrame")
+nvme_temp_frame.pack(anchor="center", pady=(0, 5))
+
+# --- NVMe 1 ---
+nvme1_name_label = ttk.Label(nvme_temp_frame, text="NVMe 1:", style="Value.Monitor.TLabel", foreground=ACCENT_COLOR)
+nvme1_name_label.pack(side="left", padx=(10, 0))
+nvme1_temp_label = ttk.Label(nvme_temp_frame, text="-- °C", style="Value.Monitor.TLabel")
+nvme1_temp_label.pack(side="left", padx=(0, 10))
+
+# --- NVMe 2 ---
+nvme2_name_label = ttk.Label(nvme_temp_frame, text="NVMe 2:", style="Value.Monitor.TLabel", foreground=ACCENT_COLOR)
+nvme2_name_label.pack(side="left", padx=(10, 0))
+nvme2_temp_label = ttk.Label(nvme_temp_frame, text="-- °C", style="Value.Monitor.TLabel")
+nvme2_temp_label.pack(side="left", padx=(0, 10))
+
+# Label para a velocidade (mantida separada para clareza)
+pcie_speed_label = ttk.Label(monitor_frame, text="Velocidade: --", style="Value.Monitor.TLabel")
+pcie_speed_label.pack(anchor="center", pady=(0, 10))
+
 
 # =================== Funções de atualização =====================
 def read_file(path):
@@ -223,12 +312,53 @@ def read_file(path):
     except:
         return "Erro"
 
+def get_cpu_power():
+    """
+    Calcula a potência instantânea da CPU em Watts a partir de energy_uj de forma
+    NÃO-BLOQUEANTE (sem time.sleep).
+    """
+    global LAST_ENERGY_READING, LAST_READING_TIME
+
+    # 1. Obter o valor atual e o tempo.
+    try:
+        # Tenta ler o valor de energia atual
+        current_energy_uj_str = read_file("/sys/class/powercap/intel-rapl:0/energy_uj")
+        if current_energy_uj_str == "Erro":
+             return "N/A"
+
+        current_energy_uj = int(current_energy_uj_str)
+        current_time = time.time()
+    except Exception:
+        return "N/A (RAPL)"
+
+    # 2. Calcular a potência se houver um valor anterior.
+    if LAST_READING_TIME != 0.0:
+        delta_energy = current_energy_uj - LAST_ENERGY_READING
+        delta_time = current_time - LAST_READING_TIME
+
+        # Evita divisão por zero e garante que o tempo decorrido seja suficiente
+        if delta_time > 0.05:
+            # Potência (W) = (Energia em Joules) / (Tempo em Segundos)
+            # 1 Joule = 1,000,000 microjoules (uj)
+            power_watts = (delta_energy / 1_000_000.0) / delta_time
+            result = f"Consumo: {power_watts:.2f} Watts"
+        else:
+            # Caso o update_monitor() tenha sido chamado muito rapidamente
+            result = cpu_power_label.cget("text")
+
+    else:
+        # Primeira execução, não é possível calcular a potência.
+        result = "Aguardando"
+
+    # 3. Armazenar os valores atuais para o próximo cálculo.
+    LAST_ENERGY_READING = current_energy_uj
+    LAST_READING_TIME = current_time
+
+    return result
+
+
 def update_monitor():
     governor_label.config(text=read_file(cpu_governor_path))
-
-    policy = read_file(pcie_policy_path)
-    speed = read_file(pcie_speed_path)
-    pcie_label.config(text=f"{policy}\nVelocidade: {speed}")
 
     # --- Frequência média e Temperatura da CPU ---
     total_freq, count = 0, 0
@@ -255,13 +385,18 @@ def update_monitor():
         cpu_temp_label.config(text=f"({temp})")
 
         # 3. Lógica de cor APENAS para a temperatura da CPU.
-        if temp_val >= 90.1: # Limite de 95°C para CPU
+        if temp_val >= 90.1: # Limite de 90°C para alerta da CPU
             cpu_temp_label.config(foreground="red")
         else:
             cpu_temp_label.config(foreground=ACCENT_COLOR)
     else:
         avg_freq_label.config(text="Erro")
         cpu_temp_label.config(text="(-- °C)", foreground=ACCENT_COLOR)
+
+
+    # --- Potência da CPU (CHAMADA INCLUÍDA) ---
+    cpu_power_val = get_cpu_power()
+    cpu_power_label.config(text=cpu_power_val)
 
 
     # --- Uso, Temperatura e Consumo da GPU ---
@@ -278,7 +413,6 @@ def update_monitor():
     gpu_temp_label.config(text=f"({gpu_temp_with_c})")
 
     # 3. Lógica de cor APENAS para a temperatura da GPU.
-    # Usando 85°C conforme sua solicitação. Se for 85°C, mude para 85.0.
     if gpu_temp_val >= 85.1:
         gpu_temp_label.config(foreground="red")
     else:
@@ -286,6 +420,37 @@ def update_monitor():
 
     gpu_power_label.config(text=f"Consumo: {gpu_power} Watts")
 
+    # --- Monitoramento PCIe e NVMe ---
+    policy = read_file(pcie_policy_path)
+    speed = read_file(pcie_speed_path)
+    nvme_temps_data = get_nvme_temps()
+
+    pcie_policy_label.config(text=policy) # Apenas a política
+    pcie_speed_label.config(text=f"Velocidade: {speed}") # Apenas a velocidade
+
+    # Função interna para atualizar a label de cada NVMe
+    def update_nvme_temperature(name, temp_label):
+        if name in nvme_temps_data:
+            data = nvme_temps_data[name]
+            temp = data['temp']
+            temp_str = data['temp_str']
+            crit = data['crit']
+
+            temp_label.config(text=temp_str)
+
+            # Alerta se a temperatura estiver 5°C abaixo do limite crítico do próprio disco.
+            if temp >= (crit - 9.8):
+                temp_label.config(foreground="red")
+            else:
+                temp_label.config(foreground=ACCENT_COLOR)
+        else:
+             temp_label.config(text="N/A", foreground=FG_LIGHT)
+
+    # Atualiza as temperaturas dos dois NVMe, usando as labels de temperatura
+    update_nvme_temperature("NVMe 1", nvme1_temp_label)
+    update_nvme_temperature("NVMe 2", nvme2_temp_label)
+
+    # Chama a si mesma novamente em 1000ms (1 segundo)
     app.after(1000, update_monitor)
 
 
