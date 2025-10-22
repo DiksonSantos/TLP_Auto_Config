@@ -116,6 +116,36 @@ def get_gpu_usage():
     except:
         return "Erro", "Erro"
 
+
+# Função para capturar o P-State da GPU -> P0, P3, P5, P8 ...
+def get_gpu_pstate():
+    try:
+        result = subprocess.run(
+            ['nvidia-smi', '--query-gpu=pstate', '--format=csv,noheader'],
+            capture_output=True, text=True, check=True
+        )
+        pstate = result.stdout.strip()
+
+        # Mapeamento do P-State para a descrição
+        if pstate in ["P0"]:
+            return f"🔥 Máximo desempenho {pstate}"
+        elif pstate in ["P1", "P2"]:
+            return f"⚡ Desempenho intermediário {pstate}"
+        elif pstate in ["P3", "P4", "P5", "P6", "P7"]:
+            return f"✨ Desempenho Baixo {pstate}"
+        elif pstate in ["P8", "P12"]:
+            return f"🌙 Ocioso / Economia {pstate}"
+        elif pstate in ["P15", "P20"]:
+            # P15 é o estado de menor potência em algumas GPUs (Deep Idle)
+            return f"💤 Economia Extrema {pstate}"
+        else:
+            # Retorna o P-State lido se não estiver mapeado
+            return f"P-State: {pstate}"
+
+    except:
+        return "N/A (P-State)"
+
+
 # Função para capturar a temperatura da CPU via lm-sensors
 def get_cpu_temp():
     try:
@@ -260,6 +290,11 @@ cpu_power_label.pack(anchor="center", pady=(0, 10)) # Com pady=(0, 10) para espa
 gpu_title = ttk.Label(monitor_frame, text="Uso da GPU", style="Title.Monitor.TLabel")
 gpu_title.pack(anchor="center")
 
+# Label para o P-State Nvidia -> P2, P8 ...
+gpu_pstate_label = ttk.Label(monitor_frame, text="-- P-State", style="Value.Monitor.TLabel", foreground="#ffb703") # Use uma cor de destaque
+gpu_pstate_label.pack(anchor="center", pady=(0, 5)) # Adicionado após o título da GPU
+# --------------------
+
 # Frame para agrupar Uso e Temperatura da GPU
 gpu_usage_frame = ttk.Frame(monitor_frame, style="Monitor.TFrame")
 gpu_usage_frame.pack(anchor="center", pady=(0, 0))
@@ -385,7 +420,7 @@ def update_monitor():
         cpu_temp_label.config(text=f"({temp})")
 
         # 3. Lógica de cor APENAS para a temperatura da CPU.
-        if temp_val >= 90.1: # Limite de 90°C para alerta da CPU
+        if temp_val >= 93.1: # Limite de 90°C para alerta da CPU
             cpu_temp_label.config(foreground="red")
         else:
             cpu_temp_label.config(foreground=ACCENT_COLOR)
@@ -403,6 +438,10 @@ def update_monitor():
     gpu_usage_percent, gpu_temp_with_c = get_gpu_usage()
     gpu_power = get_gpu_power_draw()
 
+    # Capturar e exibir o P-State da GPU
+    gpu_pstate_status = get_gpu_pstate()
+    gpu_pstate_label.config(text=gpu_pstate_status)
+
     # Extrai o valor numérico da temperatura da GPU para comparação.
     gpu_temp_val = float(re.sub(r'[^\d.]', '', gpu_temp_with_c)) if gpu_temp_with_c not in ("N/A", "Erro") else 0
 
@@ -413,7 +452,7 @@ def update_monitor():
     gpu_temp_label.config(text=f"({gpu_temp_with_c})")
 
     # 3. Lógica de cor APENAS para a temperatura da GPU.
-    if gpu_temp_val >= 85.1:
+    if gpu_temp_val >= 84.0:
         gpu_temp_label.config(foreground="red")
     else:
         gpu_temp_label.config(foreground=ACCENT_COLOR)

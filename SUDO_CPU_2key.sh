@@ -180,7 +180,36 @@ def set_cpu_governor(password):
     except Exception as e:
         print(f"Erro inesperado: {e}")
 
+from set_gpu_power import set_gpu_power_mode
+
 if __name__ == "__main__":
     user_password = senha  # substitua por input() se quiser interativo
     set_cpu_governor(user_password)
     fix_rapl_permission(user_password)
+
+    # --- Lê o governor atual ---
+    try:
+        result = subprocess.run(
+            ["cat", "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"],
+            stdout=subprocess.PIPE,
+            text=True
+        )
+        current_governor = result.stdout.strip()
+        #print(f"Governor atual: {current_governor}")
+        pass
+
+        # --- Define o modo da GPU conforme o governor ---
+        if current_governor == "performance":
+            gpu_mode = "max"
+        elif current_governor == "schedutil":
+            gpu_mode = "balanced"
+        elif current_governor == "powersave":
+            gpu_mode = "eco"
+        else:
+            gpu_mode = "balanced"  # modo padrão de segurança
+
+        print(f"Aplicando modo de GPU: {gpu_mode}")
+        set_gpu_power_mode(user_password, gpu_mode)
+
+    except Exception as e:
+        print(f"Erro ao aplicar perfil de GPU: {e}")
