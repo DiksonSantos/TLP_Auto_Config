@@ -193,10 +193,38 @@ def get_nvme_temps():
     except:
         return {} # Retorna dicionário vazio em caso de erro
 
+# Função para capturar os clocks atuais da GPU (Núcleo e Memória)
+def get_gpu_clocks():
+    """
+    Executa nvidia-smi para obter os clocks atuais do núcleo (clocks.gr) e da
+    memória (clocks.mem) em MHz.
+    """
+    try:
+        # 1. Obter Clock do Núcleo (clocks.gr)
+        result_gr = subprocess.run(
+            ['nvidia-smi', '--query-gpu=clocks.gr', '--format=csv,noheader,nounits'],
+            capture_output=True, text=True, check=True
+        )
+        # O resultado é um número. Usamos strip() para remover espaços e quebras de linha.
+        clock_gr = result_gr.stdout.strip()
+
+        # 2. Obter Clock da Memória (clocks.mem)
+        result_mem = subprocess.run(
+            ['nvidia-smi', '--query-gpu=clocks.mem', '--format=csv,noheader,nounits'],
+            capture_output=True, text=True, check=True
+        )
+        # O resultado é um número.
+        clock_mem = result_mem.stdout.strip()
+
+        # Retorna uma tupla com os valores em string.
+        return clock_gr, clock_mem
+    except:
+        return "N/A", "N/A"
+
 # =================== GUI =====================
 app = tk.Tk()
 app.title("Gerenciador de Energia e Monitoramento")
-app.geometry("600x600")
+app.geometry("500x700")
 app.resizable(False, False)
 app.configure(bg=BG_DARK)
 
@@ -293,6 +321,20 @@ gpu_title.pack(anchor="center")
 # Label para o P-State Nvidia -> P2, P8 ...
 gpu_pstate_label = ttk.Label(monitor_frame, text="-- P-State", style="Value.Monitor.TLabel", foreground="#ffb703") # Use uma cor de destaque
 gpu_pstate_label.pack(anchor="center", pady=(0, 5)) # Adicionado após o título da GPU
+
+# --- NOVO: Clocks da GPU ---
+gpu_clocks_frame = ttk.Frame(monitor_frame, style="Monitor.TFrame")
+gpu_clocks_frame.pack(anchor="center", pady=(0, 5))
+
+# Clock do Núcleo (GR)
+ttk.Label(gpu_clocks_frame, text="GPU_Clock:", style="Title.Monitor.TLabel", foreground="#1abc9c").pack(side="left", padx=(10, 0))
+gpu_gr_clock_label = ttk.Label(gpu_clocks_frame, text="-- MHz", style="Value.Monitor.TLabel")
+gpu_gr_clock_label.pack(side="left", padx=(0, 10))
+
+# Clock da Memória (MEM)
+ttk.Label(gpu_clocks_frame, text="VRAM_Clock:", style="Title.Monitor.TLabel", foreground="#1abc9c").pack(side="left", padx=(10, 0))
+gpu_mem_clock_label = ttk.Label(gpu_clocks_frame, text="-- MHz", style="Value.Monitor.TLabel")
+gpu_mem_clock_label.pack(side="left", padx=(0, 10))
 # --------------------
 
 # Frame para agrupar Uso e Temperatura da GPU
@@ -451,7 +493,24 @@ def update_monitor():
     # 2. Atualiza APENAS a temperatura da GPU (com parênteses para estética).
     gpu_temp_label.config(text=f"({gpu_temp_with_c})")
 
-    # 3. Lógica de cor APENAS para a temperatura da GPU.
+    # --- Uso, Temperatura e Consumo da GPU ---
+    gpu_usage_percent, gpu_temp_with_c = get_gpu_usage()
+    gpu_power = get_gpu_power_draw()
+
+    # 1. Capturar e exibir o P-State da GPU
+    gpu_pstate_status = get_gpu_pstate()
+    gpu_pstate_label.config(text=gpu_pstate_status)
+
+    # 2. Capturar e exibir os Clocks da GPU (Núcleo e Memória)
+    clock_gr, clock_mem = get_gpu_clocks()
+    gpu_gr_clock_label.config(text=f"{clock_gr} MHz")
+    gpu_mem_clock_label.config(text=f"{clock_mem} MHz")
+
+
+    # Extrai o valor numérico da temperatura da GPU para comparação.
+    gpu_temp_val = float(re.sub(r'[^\d.]', '', gpu_temp_with_c)) if gpu_temp_with_c not in ("N/A", "Erro") else 0
+
+    #  Lógica de cor APENAS para a temperatura da GPU.
     if gpu_temp_val >= 84.0:
         gpu_temp_label.config(foreground="red")
     else:
