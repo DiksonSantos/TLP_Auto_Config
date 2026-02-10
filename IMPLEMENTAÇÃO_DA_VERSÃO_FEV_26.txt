@@ -1,0 +1,7 @@
+# 1. Instale o arquivo sudoers
+sudo visudo -c -f 99-cpu-gpu-management  # Valida primeiro
+sudo cp 99-cpu-gpu-management /etc/sudoers.d/
+sudo chmod 440 /etc/sudoers.d/99-cpu-gpu-management
+
+# 2. Atualize o script (onde ele estiver)
+sudo cp SUDO_CPU_2key.py /caminho/do/seu/script/SUDO_CPU_2key.py

@@ -5,6 +5,7 @@ import os
 import re
 import glob
 import time
+from nvme_temp import get_nvme_temps
 
 # =================== Configurações =====================
 SCRIPT_PATH = "/home/dikson/Linux_Helper/TLP_Power_Management/SUDO_CPU_2key.sh"
@@ -134,7 +135,7 @@ def get_gpu_pstate():
         elif pstate in ["P3", "P4", "P5", "P6", "P7"]:
             return f"✨ Desempenho Baixo {pstate}"
         elif pstate in ["P8", "P12"]:
-            return f"🌙 Ocioso / Economia {pstate}"
+            return f"⏳ Ocioso / Economia {pstate}"
         elif pstate in ["P15", "P20"]:
             # P15 é o estado de menor potência em algumas GPUs (Deep Idle)
             return f"💤 Economia Extrema {pstate}"
@@ -171,27 +172,8 @@ def get_gpu_power_draw():
     except:
         return "Erro"
 
-# FUNÇÃO REVISADA PARA CAPTURAR AS TEMPERATURAS DOS DOIS NVMe
-def get_nvme_temps():
-    nvme_temps = {}
-    try:
-        result = subprocess.run(['sensors'], capture_output=True, text=True, check=True)
-        output = result.stdout
 
-        # Expressão regular que captura ID (e100 ou e200), a temperatura Composite e a crítica
-        matches = re.findall(r'(nvme-pci-e\d+).*?Composite:\s*\+(\d+\.\d)°C.*?\(crit = \+(\d+\.\d)°C\)', output, re.DOTALL)
 
-        for name, temp_val, crit_val in matches:
-            # Simplifica o nome para a GUI
-            simple_name = "NVMe 1" if "e100" in name else ("NVMe 2" if "e200" in name else name)
-            nvme_temps[simple_name] = {
-                'temp': float(temp_val),
-                'temp_str': f"+{temp_val}°C",
-                'crit': float(crit_val)
-            }
-        return nvme_temps
-    except:
-        return {} # Retorna dicionário vazio em caso de erro
 
 # Função para capturar os clocks atuais da GPU (Núcleo e Memória)
 def get_gpu_clocks():
@@ -301,7 +283,7 @@ cpu_frame.pack(anchor="center", pady=(0, 5)) # Reduzi o pady para aproximar da p
 
 # Label APENAS para a Frequência
 avg_freq_label = ttk.Label(cpu_frame, text="-- MHz", style="Value.Monitor.TLabel")
-avg_freq_label.pack(side="left", padx=5)
+#avg_freq_label.pack(side="left", padx=5)
 avg_freq_label.pack(anchor="center", pady=(5, 0)) # Adicionei título
 
 # Label APENAS para a Temperatura da CPU (será colorida)
@@ -353,7 +335,7 @@ gpu_power_label = ttk.Label(monitor_frame, text="-- W", style="Value.Monitor.TLa
 gpu_power_label.pack(anchor="center", pady=(0, 10))
 
 # --- Monitoramento PCIe e NVMe ---
-pcie_title = ttk.Label(monitor_frame, text="PCIe Policy (NVMe)", style="Title.Monitor.TLabel")
+pcie_title = ttk.Label(monitor_frame, text="PCIe Policy (NVME)", style="Title.Monitor.TLabel")
 pcie_title.pack(anchor="center")
 
 # Label APENAS para a política (ASPM)
@@ -493,9 +475,6 @@ def update_monitor():
     # 2. Atualiza APENAS a temperatura da GPU (com parênteses para estética).
     gpu_temp_label.config(text=f"({gpu_temp_with_c})")
 
-    # --- Uso, Temperatura e Consumo da GPU ---
-    gpu_usage_percent, gpu_temp_with_c = get_gpu_usage()
-    gpu_power = get_gpu_power_draw()
 
     # 1. Capturar e exibir o P-State da GPU
     gpu_pstate_status = get_gpu_pstate()
@@ -521,7 +500,7 @@ def update_monitor():
     # --- Monitoramento PCIe e NVMe ---
     policy = read_file(pcie_policy_path)
     speed = read_file(pcie_speed_path)
-    nvme_temps_data = get_nvme_temps()
+    nvme_temps_data = get_nvme_temps() ## FUNÇÃO REVISADA PARA CAPTURAR AS TEMPERATURAS DOS DOIS NVMe
 
     pcie_policy_label.config(text=policy) # Apenas a política
     pcie_speed_label.config(text=f"Velocidade: {speed}") # Apenas a velocidade
@@ -536,8 +515,8 @@ def update_monitor():
 
             temp_label.config(text=temp_str)
 
-            # Alerta se a temperatura estiver 5°C abaixo do limite crítico do próprio disco.
-            if temp >= (crit - 9.8):
+            # Alerta se a temperatura estiver 7°C abaixo do limite crítico do próprio disco.
+            if temp >= (crit - 7):
                 temp_label.config(foreground="red")
             else:
                 temp_label.config(foreground=ACCENT_COLOR)

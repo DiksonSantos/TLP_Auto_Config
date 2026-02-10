@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # coding: utf-8
-from Key import senha
 import subprocess
 import time
 import os
-from Economia import determine_governor, apply_pcie_policy
+from Padrao import determine_governor, apply_pcie_policy
 
 
 def is_steam_game_running():
@@ -63,12 +62,11 @@ def is_steam_game_running():
 
 
 
-def fix_log_permissions(password):
+def fix_log_permissions():
     """Altera as permissões do arquivo de log para 666 (leitura e escrita para todos)."""
-    cmd = "chmod 666 /var/log/pos_Blue_Brilho.log"
+    cmd = "chmod 666 /mnt/.system_offload/log/pos_Blue_Brilho.log"
     result = subprocess.run(
-        ["sudo", "-S", "bash", "-c", cmd],
-        input=f"{password}\n",
+        ["sudo", "bash", "-c", cmd],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -79,18 +77,13 @@ def fix_log_permissions(password):
         print(f"❌ Erro ao corrigir permissões do log: {result.stderr}")
 
 def is_any_steam_game_running():
-    try:
-        from WinePuro import is_proton_game_running
-        return is_steam_game_running() or is_proton_game_running()
-    except ImportError:
-        return is_steam_game_running()
+    return is_steam_game_running()
 
-def get_power_state(password):
+def get_power_state():
     """Retorna 'on_ac' se conectado na tomada, ou 'on_battery'."""
     command = "cat /sys/class/power_supply/ACAD/online"
     result = subprocess.run(
-        ["sudo", "-S", "bash", "-c", command],
-        input=f"{password}\n",
+        ["sudo", "bash", "-c", command],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -100,15 +93,14 @@ def get_power_state(password):
         return None
     return "on_ac" if result.stdout.strip() == "1" else "on_battery"
 
-def apply_governor(password, governor):
+def apply_governor(governor):
     """Aplica o governor a todos os núcleos da CPU."""
     command = (
         f"for CPU in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do "
         f"echo {governor} > $CPU; done"
     )
     result = subprocess.run(
-        ["sudo", "-S", "bash", "-c", command],
-        input=f"{password}\n",
+        ["sudo", "bash", "-c", command],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -116,12 +108,11 @@ def apply_governor(password, governor):
     return result.returncode == 0, result.stderr
 
 
-def fix_rapl_permission(password):
+def fix_rapl_permission():
     """Muda o dono do arquivo de energia da CPU para o usuário atual."""
     cmd = "chown dikson:dikson /sys/class/powercap/intel-rapl:0/energy_uj"
     result = subprocess.run(
-        ["sudo", "-S", "bash", "-c", cmd],
-        input=f"{password}\n",
+        ["sudo", "bash", "-c", cmd],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -132,43 +123,42 @@ def fix_rapl_permission(password):
         print(f"❌ Erro ao corrigir permissões: {result.stderr}")
 
 
-def fix_brightness_permission(password):
+def fix_brightness_permission():
     """Corrige a propriedade do arquivo de brilho da tela (opcional)."""
     cmd = "chown dikson:dikson /sys/class/backlight/intel_backlight/brightness"
     result = subprocess.run(
-        ["sudo", "-S", "bash", "-c", cmd],
-        input=f"{password}\n",
+        ["sudo", "bash", "-c", cmd],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
     return result.returncode == 0, result.stderr
 
-def set_cpu_governor(password):
+def set_cpu_governor():
     try:
         for i in range(1):
             print(f"\n[{i+1}/1] Verificando estado...")
 
-            power_state = get_power_state(password)
+            power_state = get_power_state()
             if power_state is None:
                 return
 
             steam_running = is_any_steam_game_running()
             governor = determine_governor(power_state, steam_running)
-            msg = apply_pcie_policy(password, power_state, steam_running)
+            msg = apply_pcie_policy(power_state, steam_running)
 
             print(f"Fonte de energia: {'Tomada' if power_state == 'on_ac' else 'Bateria'}")
             print(f"Jogo Rodando: {'Sim' if steam_running else 'Não'}")
             print(f"Governor selecionado: {governor}")
             print(f"{msg}")
 
-            success, error = apply_governor(password, governor)
+            success, error = apply_governor(governor)
             if success:
                 print(f"✅ Governor: {governor} aplicado com sucesso.")
             else:
                 print(f"❌ Erro ao aplicar governor: {error}")
 
-            ok, err = fix_brightness_permission(password)
+            ok, err = fix_brightness_permission()
             if ok:
                 print("✅ Permissão do brilho corrigida.")
             else:
@@ -183,9 +173,8 @@ def set_cpu_governor(password):
 from set_gpu_power import set_gpu_power_mode
 
 if __name__ == "__main__":
-    user_password = senha  # substitua por input() se quiser interativo
-    set_cpu_governor(user_password)
-    fix_rapl_permission(user_password)
+    set_cpu_governor()
+    fix_rapl_permission()
 
     # --- Lê o governor atual ---
     try:
@@ -209,7 +198,7 @@ if __name__ == "__main__":
             gpu_mode = "balanced"  # modo padrão de segurança
 
         print(f"Aplicando modo de GPU: {gpu_mode}")
-        set_gpu_power_mode(user_password, gpu_mode)
+        set_gpu_power_mode(gpu_mode)
 
     except Exception as e:
         print(f"Erro ao aplicar perfil de GPU: {e}")
