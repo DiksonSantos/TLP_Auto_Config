@@ -511,17 +511,17 @@ def update_monitor():
             data = nvme_temps_data[name]
             temp = data['temp']
             temp_str = data['temp_str']
-            crit = data['crit']
+            alerta_temp = data.get('alerta_temp', data['crit'] - 7 if data['crit'] else 78.0)
 
             temp_label.config(text=temp_str)
 
-            # Alerta se a temperatura estiver 7°C abaixo do limite crítico do próprio disco.
-            if temp >= (crit - 7):
+            # Muda para vermelho se passar do limite personalizado (70°C no Kingston)
+            if temp >= alerta_temp:
                 temp_label.config(foreground="red")
             else:
                 temp_label.config(foreground=ACCENT_COLOR)
         else:
-             temp_label.config(text="N/A", foreground=FG_LIGHT)
+            temp_label.config(text="N/A", foreground=FG_LIGHT)
 
     # Atualiza as temperaturas dos dois NVMe, usando as labels de temperatura
     update_nvme_temperature("NVMe 1", nvme1_temp_label)

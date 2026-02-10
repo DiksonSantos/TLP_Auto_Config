@@ -8,19 +8,18 @@ def determine_governor(power_state, steam_running):
         return "performance"
     return "schedutil"
 
-def apply_pcie_policy(password, power_state, steam_running):
+def apply_pcie_policy(power_state, steam_running):
     """Aplica a política ASPM para o perfil Turbo."""
     if power_state == "on_battery":
-        policy = "powersave"
+        policy = "powersupersave"
     elif steam_running:
         policy = "performance"
     else:
-        policy = "default"
+        policy = "powersave"
 
     cmd = f"echo {policy} > /sys/module/pcie_aspm/parameters/policy"
     result = subprocess.run(
-        ["sudo", "-S", "bash", "-c", cmd],
-        input=f"{password}\n",
+        ["sudo", "bash", "-c", cmd],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

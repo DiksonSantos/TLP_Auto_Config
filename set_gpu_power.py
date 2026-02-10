@@ -1,6 +1,6 @@
 import subprocess
 
-def set_gpu_power_mode(password, mode):
+def set_gpu_power_mode(mode):
     """
     Ajusta a GPU para um perfil de energia aproximado:
     - 'max'  -> força clocks altos (equivalente a P0/P1)
@@ -29,8 +29,7 @@ def set_gpu_power_mode(password, mode):
 
     for cmd in cmds:
         subprocess.run(
-            ["sudo", "-S", "bash", "-c", cmd],
-            input=f"{password}\n",
+            ["sudo", "bash", "-c", cmd],
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
