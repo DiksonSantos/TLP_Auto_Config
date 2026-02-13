@@ -64,7 +64,7 @@ def is_steam_game_running():
 
 def fix_log_permissions():
     """Altera as permissões do arquivo de log para 666 (leitura e escrita para todos)."""
-    cmd = "chmod 666 /mnt/.system_offload/log/pos_Blue_Brilho.log"
+    cmd = "chmod 666 /tmp/pos_Blue_Brilho.log"
     result = subprocess.run(
         ["sudo", "bash", "-c", cmd],
         text=True,

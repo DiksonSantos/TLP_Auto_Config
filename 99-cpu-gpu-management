@@ -1,10 +1,13 @@
 # Permite ao usuário dikson executar comandos de gerenciamento de CPU/GPU sem senha
+
 # Comandos relacionados a CPU governor
 dikson ALL=(ALL) NOPASSWD: /usr/bin/bash -c for CPU in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor*
 dikson ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+dikson ALL=(ALL) NOPASSWD: /usr/bin/bash -c echo * > /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 
 # Comandos relacionados a PCIe ASPM policy
 dikson ALL=(ALL) NOPASSWD: /usr/bin/bash -c echo * > /sys/module/pcie_aspm/parameters/policy
+dikson ALL=(ALL) NOPASSWD: /usr/bin/bash
 
 # Comandos relacionados a permissões de arquivos do sistema
 dikson ALL=(ALL) NOPASSWD: /usr/bin/chown dikson\:dikson /sys/class/powercap/intel-rapl\:0/energy_uj
@@ -13,9 +16,11 @@ dikson ALL=(ALL) NOPASSWD: /usr/bin/chmod 666 /mnt/.system_offload/log/pos_Blue_
 
 # Leitura de estado de energia
 dikson ALL=(ALL) NOPASSWD: /usr/bin/bash -c cat /sys/class/power_supply/ACAD/online
+dikson ALL=(ALL) NOPASSWD: /usr/bin/cat /sys/class/power_supply/ACAD/online
 
 # Comandos nvidia-smi para gerenciamento de GPU
 dikson ALL=(ALL) NOPASSWD: /usr/bin/bash -c nvidia-smi *
+dikson ALL=(ALL) NOPASSWD: /usr/bin/nvidia-smi
 
 # Comandos de suspensão
 dikson ALL=(ALL) NOPASSWD: /usr/bin/tee /proc/acpi/wakeup
