@@ -16,7 +16,7 @@ def apply_pcie_policy(power_state, steam_running):
     elif steam_running:
         policy = "powersave"
     else:
-        policy = "powersave"
+        policy = "powersupersave"
 
     cmd = f"echo {policy} > /sys/module/pcie_aspm/parameters/policy"
     result = subprocess.run(
@@ -30,8 +30,21 @@ def apply_pcie_policy(power_state, steam_running):
         return f"✅ ASPM policy aplicada: {policy}"
     else:
         return f"❌ Erro ao aplicar policy ASPM: {result.stderr}"
-    
-    
+
+def dry_run(power_state, steam_running):
+    """Retorna o que seria aplicado, sem aplicar nada."""
+    governor = determine_governor(power_state, steam_running)
+
+    if power_state == "on_battery":
+        aspm = "powersupersave"
+    elif steam_running:
+        aspm = "powersave"
+    else:
+        aspm = "powersupersave"
+
+    return governor, aspm
+
+
 # OLD
 # import subprocess
 #

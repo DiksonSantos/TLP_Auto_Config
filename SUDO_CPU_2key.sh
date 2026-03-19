@@ -202,3 +202,8 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Erro ao aplicar perfil de GPU: {e}")
+
+gpu_mode_aplicado = set_gpu_power_mode(gpu_mode)
+
+with open("/tmp/gpu_mode_atual.txt", "w") as f:
+    f.write(gpu_mode_aplicado)

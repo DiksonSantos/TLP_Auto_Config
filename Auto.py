@@ -20,3 +20,10 @@ def apply_pcie_policy(power_state, steam_running):
         return f"✅ ASPM policy aplicada: {policy}"
     else:
         return f"❌ Erro ao aplicar policy ASPM: {result.stderr}"
+
+def dry_run(power_state, steam_running):
+    """Retorna o que seria aplicado, sem aplicar nada."""
+    governor = determine_governor(power_state, steam_running)
+    aspm = "default" if power_state == "on_ac" else "powersave"
+
+    return governor, aspm
