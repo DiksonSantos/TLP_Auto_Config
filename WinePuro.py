@@ -27,7 +27,7 @@ def is_proton_game_running():
             "proton",
             "pcsx2",
             "rpcs3"
-        )) or ("wine" in ll and "steamclient" not in ll): # Exclui processos como steamclient.exe que são 32bits
+        )) or ("wine" in ll and "wineserver" not in ll and "steamclient" not in ll): # Exclui processos como steamclient.exe que são 32bits
 
             # Executa a verificação de arquitetura
             try:

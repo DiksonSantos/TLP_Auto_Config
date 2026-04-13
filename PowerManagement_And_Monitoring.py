@@ -8,7 +8,7 @@ import time
 from nvme_temp import get_nvme_temps
 
 # =================== Configurações =====================
-SCRIPT_PATH = "/home/dikson/Linux_Helper/TLP_Power_Management/SUDO_CPU_2key.sh"
+SCRIPT_PATH = "/home/dikson/Linux_Helper/TLP_Power_Management/SUDO_CPU_2key.py"
 ICON_PERFIL = "/home/dikson/Features/Icones/Perfil_Energia.png"
 ICON_MONITOR = "/home/dikson/Features/Icones/Power_Monitor_config.png"
 
