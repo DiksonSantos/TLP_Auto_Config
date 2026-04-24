@@ -60,6 +60,18 @@ if __name__ == '__main__':
     with open(SCRIPT_PATH, "r", encoding="utf-8") as file:
         return file.read()
 
+#____MOSTRAR PERFIL ATUAL AO INICIAR O POWER_MANAGEMENT__:
+def get_perfil_atual():
+    try:
+        with open(SCRIPT_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                if "from" in line and "import determine_governor" in line:
+                    return line.split()[1]  # pega o nome do perfil
+    except:
+        pass
+    return "Desconhecido"
+#__________________________________________________________________
+
 def salvar_script(conteudo):
     with open(SCRIPT_PATH, "w", encoding="utf-8") as file:
         file.write(conteudo)
@@ -221,7 +233,8 @@ except:
 wine_var = tk.BooleanVar()
 wine_var.set(ler_estado_wine())
 status_var = tk.StringVar()
-status_var.set("Perfil atual: Desconhecido")
+status_var.set(f"Perfil atual: {get_perfil_atual()}")
+#status_var.set("Perfil atual: Desconhecido")
 
 # Estilo ttk
 style = ttk.Style()
