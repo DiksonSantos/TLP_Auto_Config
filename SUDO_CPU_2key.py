@@ -97,6 +97,36 @@ def set_brightness(level):
         print(f"Erro ao ajustar brilho: {e}")
 
 
+def set_usb_power_management(mode="auto"):
+    path = "/sys/block/sdb/device/power/control"
+    if os.path.exists(path):
+        try:
+            # Usa o sudo tee conforme a permissão que você criou no sudoers
+            subprocess.run(
+                f'echo "{mode}" | sudo /usr/bin/tee {path}',
+                shell=True, check=True, stdout=subprocess.DEVNULL
+            )
+        except Exception as e:
+            print(f"Erro ao ajustar energia do USB: {e}")
+
+"""
+Para implementar a função set_usb_power_management:
+
+Crie um novo arquivo:
+sudo nano /etc/udev/rules.d/99-usb-power.rules
+
+Com:
+ACTION=="add|change", SUBSYSTEM=="usb", ATTR{product}=="Storage Device", RUN+="/bin/chmod 666 /sys/block/sdb/device/power/control"
+
+Adicionei também a linha;
+dikson ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/block/sdb/device/power/control
+
+EM:
+/etc/sudoers.d/SSD_Speed
+"""
+
+
+
 def get_gpu_mode_for_governor(governor):
     mapping = {
         "performance": "max",
@@ -144,9 +174,24 @@ def set_cpu_governor():
 # ---------------------------------------------------------------------------
 # Entry-point
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Entry-point
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     governor_aplicado = set_cpu_governor()
+
+    # --- NOVO: Gerenciamento de energia do USB/SD ---
+    power_state = get_power_state()
+    if power_state == "on_battery":
+        # Na bateria, forçamos o descanso do USB/LED
+        set_usb_power_management("auto")
+        print("🔋 Modo Bateria: USB Power Management definido como 'auto'.")
+    else:
+        # Na tomada, garantimos performance máxima para a cópia
+        set_usb_power_management("on")
+        print("🔌 Modo AC: USB Power Management definido como 'on' (Máxima estabilidade).")
+    # ------------------------------------------------
 
     if governor_aplicado is None:
         # Fallback seguro: lê o governor atual do sistema
@@ -171,3 +216,33 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"❌ Erro ao aplicar perfil de GPU: {e}")
+
+
+
+
+# if __name__ == "__main__":
+#     governor_aplicado = set_cpu_governor()
+#
+#     if governor_aplicado is None:
+#         # Fallback seguro: lê o governor atual do sistema
+#         try:
+#             with open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", "r") as f:
+#                 governor_aplicado = f.read().strip()
+#             print(f"Usando governor atual do sistema como fallback: {governor_aplicado}")
+#         except Exception as e:
+#             print(f"❌ Não foi possível ler o governor atual: {e}")
+#             governor_aplicado = "schedutil"  # último recurso
+#
+#     gpu_mode = get_gpu_mode_for_governor(governor_aplicado)
+#     print(f"Aplicando modo de GPU: {gpu_mode}")
+#
+#     try:
+#         gpu_mode_aplicado = set_gpu_power_mode(gpu_mode)
+#
+#         with open("/tmp/gpu_mode_atual.txt", "w") as f:
+#             f.write(gpu_mode_aplicado)
+#
+#         print(f"✅ Modo de GPU '{gpu_mode_aplicado}' salvo em /tmp/gpu_mode_atual.txt")
+#
+#     except Exception as e:
+#         print(f"❌ Erro ao aplicar perfil de GPU: {e}")
