@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# coding: utf-8
+
 import tkinter as tk
 from tkinter import messagebox, PhotoImage, ttk
 import subprocess
@@ -115,19 +118,28 @@ def is_any_steam_game_running():
     status_var.set("Configuração Wine atualizada.")
     messagebox.showinfo("✅ Sucesso", "Configuração Wine atualizada.\n\nReinicie o serviço systemd para aplicar.")
 
-# Função para capturar uso e temperatura da GPU
+# Função para capturar uso e temperatura da GPU UPGRADE 24/09/2026 NVIDIA-OPEN
 def get_gpu_usage():
     try:
-        result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, check=True)
-        output = result.stdout
-        # Procura a temperatura (ex: 50C) e o uso (ex: 10%)
-        match = re.search(r'\|\s*N/A\s*(\d+C)\s*P\d\s*.*?(\d+%)\s*Default\s*\|', output)
-        if match:
-            temp, usage = match.groups()
-            return usage, temp
-        return "N/A", "N/A"
-    except:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=utilization.gpu,temperature.gpu",
+                "--format=csv,noheader,nounits"
+            ],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        line = result.stdout.strip().splitlines()[0]
+        usage, temperature = [item.strip() for item in line.split(",", 1)]
+
+        return f"{usage}%", f"{temperature}°C"
+
+    except Exception:
         return "Erro", "Erro"
+
 
 
 # Função para capturar o P-State da GPU -> P0, P3, P5, P8 ...
@@ -262,6 +274,11 @@ ttk.Button(buttons_frame, text="🚀 Turbo", width=12, command=lambda: aplicar_p
 ttk.Button(buttons_frame, text="⚙️ Padrão", width=12, command=lambda: aplicar_perfil("Padrao")).pack(side="left", padx=5, pady=5)
 ttk.Button(buttons_frame, text="🔋 Economia", width=12, command=lambda: aplicar_perfil("Economia")).pack(side="left", padx=5, pady=5)
 ttk.Button(buttons_frame, text="🤖 Auto", width=12, command=lambda: aplicar_perfil("Auto")).pack(side="left", padx=5, pady=5)
+
+buttons_frame = ttk.Frame(frame_perfil)
+buttons_frame.pack(pady=5)
+
+
 
 ttk.Checkbutton(app, text="Habilitar Wine Puro", variable=wine_var, command=toggle_wine).pack(pady=5)
 ttk.Label(app, text="Se ativado, jogos via Wine puro serão detectados.").pack()
@@ -428,8 +445,22 @@ def get_cpu_power():
 
     return result
 
+##
+
+_ultimo_perfil = get_perfil_atual()
+
+def sincronizar_perfil():
+    """ Função para fazer o Applet modificar 'Perfil atual:'"""
+    global _ultimo_perfil
+    atual = get_perfil_atual()
+    if atual != _ultimo_perfil:
+        _ultimo_perfil = atual
+        status_var.set(f"Perfil atual: {atual}")
+##
 
 def update_monitor():
+    """Atualiza o monitor e sincroniza o perfil com o Applet"""
+    sincronizar_perfil()
     governor_label.config(text=read_file(cpu_governor_path))
 
     # --- Frequência média e Temperatura da CPU ---

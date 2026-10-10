@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # coding: utf-8
+
 import subprocess
 import glob
 import time
 import os
 from Padrao import determine_governor, apply_pcie_policy
 from set_gpu_power import set_gpu_power_mode
+from NVMe_Thermal import apply_nvme_thermal_policy, get_current_pcie_policy
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +58,10 @@ def is_steam_game_running():
     return False
 
 
+# ________________________________________
+
+# _______________________________________
+
 def is_any_steam_game_running():
     return is_steam_game_running()
 
@@ -97,17 +103,17 @@ def set_brightness(level):
         print(f"Erro ao ajustar brilho: {e}")
 
 
-def set_usb_power_management(mode="auto"):
-    path = "/sys/block/sdb/device/power/control"
-    if os.path.exists(path):
-        try:
-            # Usa o sudo tee conforme a permissão que você criou no sudoers
-            subprocess.run(
-                f'echo "{mode}" | sudo /usr/bin/tee {path}',
-                shell=True, check=True, stdout=subprocess.DEVNULL
-            )
-        except Exception as e:
-            print(f"Erro ao ajustar energia do USB: {e}")
+# def set_usb_power_management(mode="auto"):
+#     path = "/sys/block/sdb/device/power/control"
+#     if os.path.exists(path):
+#         try:
+#             # Usa o sudo tee conforme a permissão que você criou no sudoers
+#             subprocess.run(
+#                 f'echo "{mode}" | sudo /usr/bin/tee {path}',
+#                 shell=True, check=True, stdout=subprocess.DEVNULL
+#             )
+#         except Exception as e:
+#             print(f"Erro ao ajustar energia do USB: {e}")
 
 """
 Para implementar a função set_usb_power_management:
@@ -158,6 +164,11 @@ def set_cpu_governor():
         print(f"Governor escolhido: {governor}")
         print(f"{msg}")
 
+        # --- NOVO: lê a política ASPM recém-aplicada e ajusta o HCTM do NVMe ---
+        pcie_policy = get_current_pcie_policy()
+        ok_termico, msg_termico = apply_nvme_thermal_policy(pcie_policy)
+        print(f"🌡️ {msg_termico}" if ok_termico else f"❌ {msg_termico}")
+
         success, error = apply_governor(governor)
         if success:
             print(f"✅ Governor '{governor}' aplicado com sucesso.")
@@ -171,26 +182,25 @@ def set_cpu_governor():
         return None
 
 
-# ---------------------------------------------------------------------------
-# Entry-point
-# ---------------------------------------------------------------------------
+
 # ---------------------------------------------------------------------------
 # Entry-point
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     governor_aplicado = set_cpu_governor()
+    power_state = get_power_state()#[cite: 1]
 
     # --- NOVO: Gerenciamento de energia do USB/SD ---
-    power_state = get_power_state()
-    if power_state == "on_battery":
-        # Na bateria, forçamos o descanso do USB/LED
-        set_usb_power_management("auto")
-        print("🔋 Modo Bateria: USB Power Management definido como 'auto'.")
-    else:
-        # Na tomada, garantimos performance máxima para a cópia
-        set_usb_power_management("on")
-        print("🔌 Modo AC: USB Power Management definido como 'on' (Máxima estabilidade).")
+    # power_state = get_power_state()
+    # if power_state == "on_battery":
+    #     # Na bateria, forçamos o descanso do USB/LED
+    #     set_usb_power_management("auto")
+    #     print("🔋 Modo Bateria: USB Power Management definido como 'auto'.")
+    # else:
+    #     # Na tomada, garantimos performance máxima para a cópia
+    #     set_usb_power_management("on")
+    #     print("🔌 Modo AC: USB Power Management definido como 'on' (Máxima estabilidade).")
     # ------------------------------------------------
 
     if governor_aplicado is None:
@@ -217,6 +227,10 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ Erro ao aplicar perfil de GPU: {e}")
 
+
+    # if __name__ == "__main__":
+    #     governor_aplicado = set_cpu_governor()
+    #     power_state = get_power_state()#[cite: 1]
 
 
 

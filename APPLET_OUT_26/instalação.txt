@@ -1,0 +1,10 @@
+Extraia o arquivo:
+
+power-profile@dikson.zip
+
+PARA:
+
+~/.local/share/cinnamon/applets/
+
+
+# CLICANDO COM O BT DIR NA BARRA, VÁ A TE''applets' E ESCOLHA O NOSSO CAMPEÃO LÁ.

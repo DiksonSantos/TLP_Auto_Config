@@ -10,6 +10,26 @@ import importlib
 SUDO_CPU_PATH = '/home/dikson/Linux_Helper/TLP_Power_Management/SUDO_CPU_2key.py'
 sys.path.insert(0, '/home/dikson/Linux_Helper/TLP_Power_Management/')
 
+# Gap (em segundos) entre relógio de parede e relógio monotônico que indica
+# que o sistema foi suspenso (standby). Ver _detectar_suspensao() mais abaixo.
+# Mesma técnica usada no fan_control.py: durante a suspensão, o relógio de
+# parede (time.time()) salta pra frente, mas o monotônico (time.monotonic())
+# fica pausado no Linux — a diferença entre os dois é o tempo suspenso.
+SUSPEND_GAP_SEGUNDOS = 8
+
+
+def set_fan_profile(perfil):
+    """Ventoinha Inteligente -> 1.40V na tomada, e Volta a AUTO em AC """
+    try:
+        import socket
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+            client.settimeout(0.5)
+            client.connect("/tmp/fan_control.sock")
+            client.send(f"PERFIL:{perfil}".encode())
+    except:
+        pass
+
+
 def get_perfil_do_script():
     """Lê qual perfil (módulo) está importado na linha 'from X import ...' do SUDO_CPU."""
     try:
@@ -73,6 +93,27 @@ def kill_wineserver_if_stale():
     except Exception as e:
         print(f"Erro na limpeza: {e}")
 
+
+def detectar_suspensao(last_wall, last_mono):
+    """
+    Compara relógio de parede com relógio monotônico para detectar se o
+    sistema foi suspenso desde a última checagem (ver SUSPEND_GAP_SEGUNDOS).
+
+    Retorna (suspensao_detectada: bool, agora_wall, agora_mono) — os dois
+    últimos valores devem ser guardados pelo chamador para a próxima checagem.
+    """
+    agora_wall = time.time()
+    agora_mono = time.monotonic()
+
+    suspensao_detectada = False
+    if last_wall is not None:
+        gap = (agora_wall - last_wall) - (agora_mono - last_mono)
+        if gap > SUSPEND_GAP_SEGUNDOS:
+            suspensao_detectada = True
+
+    return suspensao_detectada, agora_wall, agora_mono
+
+
 # ---------------------------------------------------------------------------
 # Inicialização
 # ---------------------------------------------------------------------------
@@ -81,9 +122,29 @@ subprocess.call(f'python3 {SUDO_CPU_PATH}', shell=True)
 
 steam_anterior = False
 perfil_atual = get_perfil_do_script()
+estado_energia_anterior = None
+_last_wall_clock = None
+_last_monotonic = None
 
 while True:
     time.sleep(5)
+
+    # --- Detecção de suspensão do sistema (standby) ---
+    # A PCIe Policy e o governor sobrevivem à suspensão (o kernel preserva
+    # esses valores em sysfs), mas o registro de HCTM do controlador NVMe
+    # NÃO sobrevive (o controlador reseta pro valor de fábrica). Como a
+    # checagem de "divergência" mais abaixo só compara governor/ASPM, ela
+    # nunca percebe essa perda sozinha — por isso a suspensão precisa ser
+    # detectada explicitamente aqui, e forçar a reaplicação completa.
+    suspensao_detectada, _last_wall_clock, _last_monotonic = detectar_suspensao(
+        _last_wall_clock, _last_monotonic
+    )
+    if suspensao_detectada:
+        print("💤 Suspensão do sistema detectada - reaplicando perfil completo "
+              "(governor/PCIe/HCTM do NVMe/GPU)...")
+        subprocess.call(f'python3 {SUDO_CPU_PATH}', shell=True)
+
+    power_state = get_power_state()
 
     # 1. Verifica se você mudou o perfil na GUI (Turbo/Padrão/Eco)
     perfil_novo = get_perfil_do_script()
@@ -118,7 +179,22 @@ while True:
     except:
         continue
 
+    # Muda Rotação da Ventoinha apenas na TRANSIÇÃO de energia:
+    if power_state != estado_energia_anterior:
+        if power_state == "on_battery":
+            set_fan_profile("BASICO")
+            print("🔋 Ventoinha_Nvme em LENTA (Usando: Bateria)")
+
+        if power_state == "on_ac" and power_state != estado_energia_anterior:
+            set_fan_profile("NORMAL")
+            print("🔌 Ventoinha_Nvme em AUTO (Usando: Tomada)")
+
+        # ATUALIZA O ESTADO para evitar repetições no próximo loop de 5s
+        estado_energia_anterior = power_state
+
+
     print(f"[{perfil_atual}] Esperado: {gov_esperado}/{aspm_esperado} | Atual: {gov_atual}/{aspm_atual}")
+
 
     if gov_atual != gov_esperado or aspm_atual != aspm_esperado:
         print("🔄 Estado divergente. Aplicando perfil...")
